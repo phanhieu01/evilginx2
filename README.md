@@ -60,6 +60,111 @@ If you want to learn more about reverse proxy phishing, I've published extensive
 
 [Evilginx 3.3](https://breakdev.org/evilginx-3-3-go-phish/)
 
+## Token Modification
+
+Evilginx now supports real-time modification of authentication tokens in HTTP requests. This feature allows you to intercept and modify tokens (such as JWT, Bearer tokens, API keys) before they are sent to the target server.
+
+### Features
+
+- **Token Pattern Matching**: Supports regex patterns to identify different token types (JWT, Bearer, Basic Auth, custom tokens)
+- **Multiple Actions**: Replace, add prefix/suffix, or remove tokens entirely
+- **Multiple Locations**: Modify tokens in HTTP headers, cookies, query parameters, and request body
+- **Rule Management**: Enable/disable rules individually, list all rules, clear rules
+- **Preset Configurations**: Quick setup for common token types
+
+### Usage
+
+#### Basic Commands
+
+```bash
+# Enable token modification globally
+tokens enable
+
+# Disable token modification globally
+tokens disable
+
+# Show current status
+tokens status
+
+# List all configured rules
+tokens list
+
+# Clear all rules
+tokens clear
+```
+
+#### Quick Setup with Presets
+
+```bash
+# Add prefix to JWT tokens
+tokens preset jwt "modified_"
+
+# Add prefix to Bearer tokens  
+tokens preset bearer "test_"
+```
+
+#### Advanced Rule Configuration
+
+```bash
+# Add custom rule
+# Syntax: tokens add rule <pattern> <action> <value> <description> <location> <target>
+tokens add rule "^Bearer\s+(.+)$" "replace" "Bearer modified_$1" "Modify Bearer tokens" "header" "Authorization"
+
+# Enable/disable specific rules
+tokens rule enable "Modify Bearer tokens"
+tokens rule disable "Modify Bearer tokens"
+```
+
+#### Rule Actions
+
+- **replace**: Replace the entire token with a new value (supports regex groups with $1, $2, etc.)
+- **prefix**: Add text before the token
+- **suffix**: Add text after the token  
+- **remove**: Remove the token completely
+- **extract**: Extract specific parts using regex groups
+
+#### Token Locations
+
+- **header**: HTTP headers (e.g., Authorization, X-API-Key)
+- **cookie**: Cookie values
+- **query**: URL query parameters
+- **body**: Request body content
+
+### Examples
+
+#### Example 1: Modify JWT Tokens
+```bash
+# Enable token modification
+tokens enable
+
+# Add rule to prefix JWT tokens with "test_"
+tokens preset jwt "test_"
+
+# All JWT tokens in Authorization header will be prefixed with "test_"
+# Before: Authorization: eyJhbGciOiJIUzI1NiIs...
+# After:  Authorization: test_eyJhbGciOiJIUzI1NiIs...
+```
+
+#### Example 2: Replace API Keys
+```bash
+# Replace API keys with a test key
+tokens add rule "^(.+)$" "replace" "test-api-key-12345" "Replace API keys" "header" "X-API-Key"
+```
+
+#### Example 3: Modify Cookie Session Tokens
+```bash
+# Add prefix to all cookie values
+tokens add rule "^(.+)$" "prefix" "modified_" "Modify session cookies" "cookie" ""
+```
+
+### Security Considerations
+
+- Token modification happens before requests reach the target server
+- Original tokens are logged and can be captured through Evilginx's session management
+- Use responsibly and only for authorized penetration testing
+- Rules are applied in the order they were added
+- Disabled rules are skipped during processing
+
 ## Help
 
 In case you want to learn how to install and use **Evilginx**, please refer to online documentation available at:

